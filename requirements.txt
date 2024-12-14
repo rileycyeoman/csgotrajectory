@@ -1,0 +1,7 @@
+--extra-index-url https://download.pytorch.org/whl/cu116
+python_version < 3.8
+torch
+torchvision
+torchaudio
+numpy
+transformers
