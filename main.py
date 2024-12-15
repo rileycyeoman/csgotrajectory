@@ -51,6 +51,43 @@ class SplineLoss(nn.Module):
             loss += mse_loss
 
         return torch.tensor(loss / batch_size, requires_grad=True).to(true_frames.device)
+    
+
+class MSEFrameLoss(nn.Module):
+    def __init__(self, alpha=1.0, frame_interval=10):
+        super(MSEFrameLoss, self).__init__()
+        self.alpha = alpha
+        self.frame_interval = frame_interval
+        self.base_loss = nn.MSELoss(alpha=alpha)
+    
+    def forward(self, true_frames, predicted_frames):
+        batch_size, num_frames, frame_dims = true_frames.shape
+        
+        loss = 0.0
+        
+        for i in range(batch_size):
+            true_frames_batch = true_frames[i].detach().cpu().numpy()  # Convert to numpy for spline fitting
+            predicted_frames_batch = predicted_frames[i].detach().cpu().numpy()
+
+            time_steps = np.arange(num_frames)
+            #TODO: account for time steps in MSEloss?
+            #TODO: do something about frame interval
+
+            #true_spline = CubicSpline(time_steps, true_frames_batch, axis=0)
+            #predicted_spline = CubicSpline(time_steps, predicted_frames_batch, axis=0)
+
+
+            #sample_times = np.arange(0, num_frames, self.frame_interval)
+
+            #true_samples = true_spline(sample_times)  # Shape: (num_samples, frame_dims)
+            #predicted_samples = predicted_spline(sample_times)  # Shape: (num_samples, frame_dims)
+
+            #mse_loss = np.mean((true_samples - predicted_samples) ** 2)
+            mse_loss = self.base_loss(predicted_frames_batch, true_frames_batch)
+
+            loss += mse_loss
+
+        return torch.tensor(loss / batch_size, requires_grad=True).to(true_frames.device)
 
 
 def prepare_sequences(df, sequence_length):
@@ -100,7 +137,7 @@ from transformers import AdamW
 
 optimizer = AdamW(model.parameters(), lr=5e-5)
 spline_loss_fn = SplineLoss(alpha=0.5, frame_interval=10)
-mse_loss_fn = nn.MSELoss(alpha = 0.5) # TODO: what to do about frame interval...
+mse_loss_fn = MSEFrameLoss(alpha = 0.5, frame_interval=10)
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 model.to(device)
@@ -123,15 +160,15 @@ for epoch in range(3):
         criterion2 = mse_loss_fn(labels, logits) #TODO: need to compare the output to the correct next frame...
 
 
-        # # Parameters for combined loss
-        # alpha = 0.5
-        # beta = 0.5
+        # Parameters for combined loss
+        alpha = 0.5
+        beta = 0.5
 
         # Calculate the combined loss
         def combined_loss(output, target):
             loss1 = criterion1(labels, logits)
             loss2 = criterion2(labels, logits)
-            #return alpha * loss1 + beta * loss2
+            return alpha * loss1 + beta * loss2
 
         loss = combined_loss(labels, logits)
 
