@@ -148,18 +148,14 @@ for epoch in range(3):
 
         #loss = spline_loss_fn(labels, logits)
 
-        criterion1 = spline_loss_fn(labels, logits)
-        criterion2 = mse_loss_fn(labels, logits) #TODO: need to compare the output to the correct next frame...
-
-
         # Parameters for combined loss
         alpha = 0.5
         beta = 0.5
 
         # Calculate the combined loss
         def combined_loss(output, target):
-            loss1 = criterion1(labels, logits)
-            loss2 = criterion2(labels, logits)
+            loss1 = spline_loss_fn.forward(output, target)
+            loss2 = mse_loss_fn.forward(output, target)
             return alpha * loss1 + beta * loss2
 
         loss = combined_loss(labels, logits)
