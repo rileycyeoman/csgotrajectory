@@ -69,21 +69,13 @@ class MSEFrameLoss(nn.Module):
             true_frames_batch = true_frames[i].detach().cpu().numpy()  # Convert to numpy for spline fitting
             predicted_frames_batch = predicted_frames[i].detach().cpu().numpy()
 
-            time_steps = np.arange(num_frames)
-            #TODO: account for time steps in MSEloss?
-            #TODO: do something about frame interval
+            sample_times = np.arange(0, num_frames, self.frame_interval)
+            # TODO: comment out the to numpy and use torch.arange() instead?
 
-            #true_spline = CubicSpline(time_steps, true_frames_batch, axis=0)
-            #predicted_spline = CubicSpline(time_steps, predicted_frames_batch, axis=0)
+            true_samples = true_frames_batch[sample_times, :]  # Shape: (num_samples, frame_dims)
+            predicted_samples = predicted_frames_batch[sample_times, :]  # Shape: (num_samples, frame_dims)
 
-
-            #sample_times = np.arange(0, num_frames, self.frame_interval)
-
-            #true_samples = true_spline(sample_times)  # Shape: (num_samples, frame_dims)
-            #predicted_samples = predicted_spline(sample_times)  # Shape: (num_samples, frame_dims)
-
-            #mse_loss = np.mean((true_samples - predicted_samples) ** 2)
-            mse_loss = self.base_loss(predicted_frames_batch, true_frames_batch)
+            mse_loss = self.base_loss(true_samples, predicted_samples)
 
             loss += mse_loss
 
