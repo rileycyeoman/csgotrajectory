@@ -99,7 +99,8 @@ train_loader = DataLoader(dataset, batch_size=8, shuffle=True)
 from transformers import AdamW
 
 optimizer = AdamW(model.parameters(), lr=5e-5)
-spline_loss_fn = SplineLoss(alpha=1.0, frame_interval=10)
+spline_loss_fn = SplineLoss(alpha=0.5, frame_interval=10)
+mse_loss_fn = nn.MSELoss(alpha = 0.5) # TODO: what to do about frame interval...
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 model.to(device)
@@ -116,7 +117,23 @@ for epoch in range(3):
         outputs = model(input_ids=input_ids, attention_mask=attention_mask)
         logits = outputs.logits
 
-        loss = spline_loss_fn(labels, logits)
+        #loss = spline_loss_fn(labels, logits)
+
+        criterion1 = spline_loss_fn(labels, logits)
+        criterion2 = mse_loss_fn(labels, logits) #TODO: need to compare the output to the correct next frame...
+
+
+        # # Parameters for combined loss
+        # alpha = 0.5
+        # beta = 0.5
+
+        # Calculate the combined loss
+        def combined_loss(output, target):
+            loss1 = criterion1(labels, logits)
+            loss2 = criterion2(labels, logits)
+            #return alpha * loss1 + beta * loss2
+
+        loss = combined_loss(labels, logits)
 
 
         loss.backward()
