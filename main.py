@@ -27,7 +27,10 @@ class SplineLoss(nn.Module):
         self.frame_interval = frame_interval
     
     def forward(self, true_frames, predicted_frames):
-        batch_size, num_frames, frame_dims = true_frames.shape
+        #batch_size, num_frames, frame_dims = true_frames.shape
+        batch_size, num_frames = true_frames.shape
+        #print(true_frames.shape) # ([8, 128])
+        #print(predicted_frames.shape) #([8, 128, 32128])
         
         loss = 0.0
         
@@ -44,9 +47,12 @@ class SplineLoss(nn.Module):
 
             true_samples = true_spline(sample_times)  # Shape: (num_samples, frame_dims)
             predicted_samples = predicted_spline(sample_times)  # Shape: (num_samples, frame_dims)
+            
+            #print(np.shape(true_samples))
+            #print(np.shape(predicted_samples))
 
-            mse_loss = np.mean((true_samples - predicted_samples) ** 2)
-
+            #mse_loss = num.sum([np.mean((true_samples - predicted_samples[k]) ** 2) for k in range(predicted_sampes)[2]])
+            mse_loss = np.mean((true_samples - predicted_samples[:, 0]) ** 2)
 
             loss += mse_loss
 
@@ -58,10 +64,12 @@ class MSEFrameLoss(nn.Module):
         super(MSEFrameLoss, self).__init__()
         self.alpha = alpha
         self.frame_interval = frame_interval
-        self.base_loss = nn.MSELoss(alpha=alpha)
+        self.base_loss = nn.MSELoss()
     
     def forward(self, true_frames, predicted_frames):
-        batch_size, num_frames, frame_dims = true_frames.shape
+        #print(true_frames.shape)
+        #print(predicted_frames.shape)
+        batch_size, num_frames = true_frames.shape
         
         loss = 0.0
         
@@ -71,11 +79,15 @@ class MSEFrameLoss(nn.Module):
 
             sample_times = np.arange(0, num_frames, self.frame_interval)
             # TODO: comment out the to numpy and use torch.arange() instead?
+            
+            #print(np.shape(true_frames_batch))
+            #print(np.shape(predicted_samples))
 
-            true_samples = true_frames_batch[sample_times, :]  # Shape: (num_samples, frame_dims)
-            predicted_samples = predicted_frames_batch[sample_times, :]  # Shape: (num_samples, frame_dims)
+            #true_samples = true_frames_batch[sample_times, :]  # Shape: (num_samples, frame_dims)
+            #predicted_samples = predicted_frames_batch[sample_times, :]  # Shape: (num_samples, frame_dims)
 
-            mse_loss = self.base_loss(true_samples, predicted_samples)
+            #mse_loss = self.base_loss(true_frames_batch, predicted_frames_batch)
+            mse_loss = np.mean((true_frames_batch - predicted_frames_batch[:, 0]) ** 2)
 
             loss += mse_loss
 
@@ -87,59 +99,65 @@ def prepare_sequences(df, sequence_length):
     output_sequences = []
 
     for i in range(len(df) - sequence_length):
-        input_seq = df.iloc[i:i+sequence_length].values.flatten().tolist()
+        input_seq = df.iloc[i+sequence_length].values.flatten().tolist()
+        input_seq = input_seq[1:] # list
+        # tokenizer expects a string, so turning the data into a string
+        input_seq = " ".join(str(x) for x in input_seq)
+        
         output_seq = df.iloc[i+sequence_length].values.flatten().tolist()
+        output_seq = output_seq[1:] #list
+        output_seq = " ".join(str(x) for x in output_seq)
+        
         input_sequences.append(input_seq)
+        
+        #if i == 0:
+            #print(input_seq)
+            #print(output_seq)
         output_sequences.append(output_seq)
     
     return input_sequences, output_sequences
 
 def tokenize_data(input_sequences, output_sequences, tokenizer, max_length=128):
-    input_encodings = tokenizer(input_sequences, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
-    output_encodings = tokenizer(output_sequences, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
+    input_encodings = {}
+    input_encodings["input_ids"] = tokenizer(input_sequences, padding=True, truncation=True, max_length=max_length, return_tensors="pt").input_ids
+    input_encodings["attention_mask"] = tokenizer(input_sequences, padding=True, truncation=True, max_length=max_length, return_tensors="pt").attention_mask
+    #print(input_encodings)
+    #print(output_encodings)
+    output_encodings = {}
+    output_encodings["input_ids"] = tokenizer(output_sequences, padding=True, truncation=True, max_length=max_length, return_tensors="pt").input_ids
 
     # Shift the labels for autoregressive language models (causal language modeling)
     labels = output_encodings['input_ids'].clone()
+    #labels = output_encodings.clone()
     return input_encodings, labels
 
 
 class Seq2SeqDataset(Dataset):
     def __init__(self, input_encodings, labels):
-        self.input_encodings = input_encodings
+        self.input_encodings = input_encodings # ['', '']
         self.labels = labels
 
     def __len__(self):
+        #print(self.input_encodings)
         return len(self.input_encodings['input_ids'])
+        #return len(self.input_encodings)
 
     def __getitem__(self, idx):
         return {
             'input_ids': self.input_encodings['input_ids'][idx],
+            #'input_ids': self.input_encodings[idx],
             'attention_mask': self.input_encodings['attention_mask'][idx],
             'labels': self.labels[idx]
         }
+        
 
-path = 'data/'
-pickle_file = 'data/lan_frames_df.pkl'
-parser = DemoParser(path)
-
-
-# parser.parse_demos()
-
-
-parser.save_to_pickle('lan_frames_df.pkl')
-
-
-lan_frames_df = parser.load_from_pickle(pickle_file)
-
-print(parser.dataframe_shape())
-print(parser.dataframe_head())
-
-
-
-
+#parser = pd.load_from_pickle()
+#lan_frames_df = parser.load_from_pickle('/content/lan_frames_df.pkl')
+lan_frames_df = pd.read_pickle('/content/lan_frames_df.pkl')
 input_sequences, output_sequences = prepare_sequences(lan_frames_df, sequence_length=3)  # Customize sequence length
 input_encodings, labels = tokenize_data(input_sequences, output_sequences, tokenizer)
 
+#print(input_encodings)
 
 dataset = Seq2SeqDataset(input_encodings, labels)
 train_loader = DataLoader(dataset, batch_size=8, shuffle=True)
@@ -162,8 +180,18 @@ for epoch in range(3):
         labels = batch['labels'].to(device)
 
 
-        outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+        #outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+        #outputs = model(decoder_input_ids=input_ids, attention_mask=attention_mask)
+        outputs = model(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    decoder_input_ids=labels  # Pass target token IDs as decoder input IDs
+)
         logits = outputs.logits
+        
+        #print(outputs)
+        #print(labels)
+        
 
         #loss = spline_loss_fn(labels, logits)
 
@@ -190,10 +218,26 @@ for epoch in range(3):
 
 
 
-demoID = '0013db25-4444-452b-980b-7702dc6fb810'
-roundNum = 1
-filtered_demo = parser.demo_stats(demoID, roundNum)
-print(filtered_demo)
+#path = ''
+#parser = DemoParser(path)
+
+
+#parser.parse_demos()
+
+
+#parser.save_to_pickle('lan_frames_df.pkl')
+
+
+#lan_frames_df = parser.load_from_pickle('/content/lan_frames_df.pkl')
+
+#print(parser.dataframe_shape())
+#print(parser.dataframe_head())
+
+
+#demoID = '0013db25-4444-452b-980b-7702dc6fb810'
+#roundNum = 1
+#filtered_demo = parser.demo_stats(demoID, roundNum)
+#print(filtered_demo)
 
 
 
