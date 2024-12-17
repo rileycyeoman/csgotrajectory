@@ -117,7 +117,26 @@ class Seq2SeqDataset(Dataset):
             'attention_mask': self.input_encodings['attention_mask'][idx],
             'labels': self.labels[idx]
         }
-        
+
+path = 'data/'
+pickle_file = 'data/lan_frames_df.pkl'
+parser = DemoParser(path)
+
+
+# parser.parse_demos()
+
+
+parser.save_to_pickle('lan_frames_df.pkl')
+
+
+lan_frames_df = parser.load_from_pickle(pickle_file)
+
+print(parser.dataframe_shape())
+print(parser.dataframe_head())
+
+
+
+
 input_sequences, output_sequences = prepare_sequences(lan_frames_df, sequence_length=3)  # Customize sequence length
 input_encodings, labels = tokenize_data(input_sequences, output_sequences, tokenizer)
 
@@ -169,22 +188,6 @@ for epoch in range(3):
 
     print(f'Epoch {epoch + 1}, Loss: {loss.item()}')
 
-
-
-path = ''
-parser = DemoParser(path)
-
-
-parser.parse_demos()
-
-
-parser.save_to_pickle('lan_frames_df.pkl')
-
-
-lan_frames_df = parser.load_from_pickle('lan_frames_df.pkl')
-
-print(parser.dataframe_shape())
-print(parser.dataframe_head())
 
 
 demoID = '0013db25-4444-452b-980b-7702dc6fb810'
