@@ -245,12 +245,16 @@ for epoch in range(3):
 model.eval()
 
 def predict_next_cell(input_sequence, model, tokenizer):
-    input_encodings = tokenizer(input_sequence, return_tensors="pt").to(device)
+    input_encodings = {}
+    input_encodings["input_ids"] = tokenizer(input_sequence, return_tensors="pt").to(device).input_ids
+    input_encodings["attention_mask"] = tokenizer(input_sequence, return_tensors="pt").to(device).attention_mask
     output = model.generate(input_ids=input_encodings['input_ids'], attention_mask=input_encodings['attention_mask'], max_length=50)
     predicted_cell = tokenizer.decode(output[0], skip_special_tokens=True)
     return predicted_cell
 
 # Example: predict the next cell after an input sequence
 input_sequence = lan_frames_df.iloc[:3].values.flatten().tolist()  # Example input sequence
+input_sequence = input_sequence[1:] 
+input_sequence = " ".join(str(x) for x in input_sequence)
 predicted_cell = predict_next_cell(input_sequence, model, tokenizer)
 print(f'Predicted next cell: {predicted_cell}')
